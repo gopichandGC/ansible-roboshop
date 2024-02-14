@@ -1,0 +1,82 @@
+- name: User Component
+  hosts: user
+  vars:
+    MONGODB_HOST: mongodb.techwithgopi.online
+  become: yes
+  tasks:
+  - name: disable old nodejs andenable nodejs:18
+    ansible.builtin.shell: dnf module disable nodejs -y; dnf module enable nodejs:18 -y
+
+  - name: Install nodejs
+    ansible.builtin.dnf:
+      name: nodejs
+      state: present
+
+  - name: create roboshop user
+    ansible.builtin.user:
+      name: roboshop
+
+  - name: Recursively removing app directory
+    ansible.builtin.file:
+      path: /app
+      state: absent
+
+  - name: creating app directory
+    ansible.builtin.file:
+      path: /app
+      state: directory
+
+  - name: download user application
+    ansible.builtin.get_url:
+     url: https://roboshop-builds.s3.amazonaws.com/user.zip
+     dest: /tmp
+
+  - name: Unzipping user application
+    ansible.builtin.unarchive:
+      src: /tmp/user.zip
+      dest: /app
+      remote_src: yes
+
+  - name: Installing Dependencies
+    ansible.builtin.command: npm install
+    args:
+      chdir: /app
+
+  - name: Copying user service
+    ansible.builtin.copy:
+      src: user.service
+      dest: /etc/systemd/system/user.service
+
+  - name: deamon reload # After changing service file
+    ansible.builtin.systemd_service:
+      daemon_reload: true
+
+  - name: Copy mongodb repo
+    ansible.builtin.copy:
+      src: mongodb.repo
+      dest: /etc/yum.repos.d/mongodb.repo
+
+  - name: Install mongodb client
+    ansible.builtin.package:
+      name: mongodb-org-shell
+      state: present
+
+  - name: get the catagories count
+    ansible.builtin.command: mongo --host mongodb.techwithgopi.online --quiet -- eval 'db=db.getSiblingDB("users"); db.users.count()'
+    register: user_count
+
+  # - name: print the count
+  #   ansible.builtin.debug:
+  #     msg: "user count is: {{user_count}}"
+
+  - name: Load user data
+    ansible.builtin.command: mongo --host {{MONGODB_HOST}} < /app/schema/user.js
+    when: user_count.stdout == "0"
+
+  - name: restart and enable user
+    ansible.builtin.service:
+      name: user
+      state: restarted
+      enabled: yes
+
+  
