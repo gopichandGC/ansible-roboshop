@@ -62,7 +62,7 @@
       state: present
 
   - name: get the catagories count
-    ansible.builtin.command: mongo --host mongodb.techwithgopi.online --quiet -- eval 'db=db.getSiblingDB("users"); db.users.count()'
+    ansible.builtin.command: mongo --host mongodb.techwithgopi.online --quiet --eval 'db=db.getSiblingDB("users"); db.users.count()'
     register: user_count
 
   # - name: print the count
